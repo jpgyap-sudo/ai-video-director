@@ -1,0 +1,6 @@
+node_modules/
+.next/
+.stanley-runtime.json
+*.log
+.env
+.env.local
