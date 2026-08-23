@@ -56,14 +56,33 @@ Local suite at the Phase 0 tip: **31 API tests, 1 worker test, ruff clean, mypy 
 - **Gate commit:** _not reached_
 - **Decision:** _not reached_
 
-Slices landed so far (on `phase-1-products`):
+Slices landed on `master` (hashes verified reachable from `master`):
 
 | Commit | Slice |
 |---|---|
-| `9c12cac` | RFC 9457 problem details + org bootstrap |
-| `cb0ed96` | Corrections: DB-backed org resolution, problem schema in OpenAPI, `urn:` problem types |
-| `f9a776e` | `products`, `product_assets`, `version` fields (migration `0002`) |
-| `4f2d4a1` | Cleanup: unique `(organization_id, sku)`, dependency usage, 422 problem schema |
+| `01765cb` | RFC 9457 problem details + org bootstrap |
+| `f4a98a4` | Corrections: DB-backed org resolution, problem schema in OpenAPI, `urn:` problem types |
+| `bcf9aba` | `products`, `product_assets`, `version` fields (migration `0002`) |
+| `5db60ff` | Cleanup: unique `(organization_id, sku)`, dependency usage, 422 problem schema |
+| `d7070e9` | Signed uploads: `upload-intents` → `complete` (migration `0003`) |
+| `defc43e` | Upload corrections: magic-byte sniffing, size limit, AV hook, idempotency |
 
-Remaining Phase 1 scope: signed uploads, references + rights attestation,
-campaigns, Runway adapter, generation attempts, reviews, cost events.
+Remaining Phase 1 scope: references + rights attestation, campaigns, Runway
+adapter, generation attempts, reviews, cost events.
+
+### Known gaps carried forward
+
+- **Upload size is capped at `complete`, not at upload.** A presigned PUT cannot
+  constrain content length, so an oversized object is stored before it is
+  rejected. Presigned POST with a `content-length-range` policy condition would
+  enforce it at the edge.
+- **No quarantine cleanup.** Objects that fail sniffing or checksum stay in the
+  bucket, and intents that are never completed leave orphan `QUARANTINED` rows.
+  `IMPLEMENTATION_PLAN.md:311` requires object lifecycle rules and `:352` lists
+  temporary-asset cleanup as a required Phase 1 test.
+- **`NoopAntivirusScanner` does not scan.** It satisfies the plan's "antivirus
+  hook interface" requirement, but `VALIDATED` must not be read downstream as
+  "malware-checked" until a real scanner is wired in.
+- **`version` columns are inert.** No endpoint increments them and no `If-Match`
+  is honoured, so `IMPLEMENTATION_PLAN.md:620` (optimistic concurrency) is only
+  half met. The first update endpoint must not ship without it.
