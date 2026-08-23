@@ -16,7 +16,16 @@ from avd_api.authorization import (
 )
 from avd_api.config import get_settings
 from avd_api.db import get_db
-from avd_api.models import Membership, Organization, Product, Project, User
+from avd_api.media import ALLOWED_CONTENT_TYPES, sha256_hex, sniff_content_type
+from avd_api.models import (
+    Membership,
+    Organization,
+    Product,
+    ProductAsset,
+    Project,
+    User,
+    uuid7,
+)
 from avd_api.problems import problem_response, register_problem_handlers
 from avd_api.storage import ObjectStorage, build_storage
 
@@ -226,4 +235,118 @@ def create_product(
         "sku": product.sku,
         "name": product.name,
         "version": product.version,
+    }
+
+
+class CreateUploadIntentRequest(BaseModel):
+    product_id: str = Field(min_length=1)
+    content_type: str = Field(min_length=1, max_length=255)
+    size_bytes: int = Field(gt=0, le=100 * 1024 * 1024)
+
+
+@app.post(
+    "/v1/assets/upload-intents",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def create_upload_intent(
+    body: CreateUploadIntentRequest,
+    organization_id: str = Depends(require_org_principal),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+    storage: ObjectStorage = Depends(get_storage),
+) -> dict[str, str]:
+    if body.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported content type: {body.content_type}",
+        )
+    product = db.get(Product, body.product_id)
+    if product is None or product.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+    asset_id = uuid7()
+    object_key = f"org/{organization_id}/products/{product.id}/assets/{asset_id}"
+    upload_url = storage.presigned_upload_url(object_key, body.content_type)
+    asset = ProductAsset(
+        id=asset_id,
+        organization_id=organization_id,
+        product_id=product.id,
+        object_key=object_key,
+        content_type=body.content_type,
+        checksum="",  # set on complete
+        size_bytes=body.size_bytes,
+        status="QUARANTINED",
+    )
+    db.add(asset)
+    db.commit()
+    return {
+        "asset_id": asset.id,
+        "upload_url": upload_url,
+        "object_key": object_key,
+    }
+
+
+class CompleteAssetRequest(BaseModel):
+    checksum: str = Field(min_length=1, max_length=128)
+
+
+@app.post(
+    "/v1/assets/{asset_id}/complete",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def complete_asset(
+    asset_id: str,
+    body: CompleteAssetRequest,
+    organization_id: str = Depends(require_org_principal),
+    db: Session = Depends(get_db),
+    storage: ObjectStorage = Depends(get_storage),
+) -> dict[str, str | int]:
+    asset = db.get(ProductAsset, asset_id)
+    if asset is None or asset.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found",
+        )
+    if not storage.exists(asset.object_key):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Object not uploaded yet",
+        )
+    data = storage.get(asset.object_key)
+    sniffed = sniff_content_type(data)
+    if sniffed is None or sniffed != asset.content_type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Object content does not match declared content type",
+        )
+    actual_checksum = sha256_hex(data)
+    if actual_checksum != body.checksum:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Checksum mismatch",
+        )
+    asset.checksum = actual_checksum
+    asset.size_bytes = len(data)
+    asset.status = "VALIDATED"
+    db.commit()
+    db.refresh(asset)
+    return {
+        "id": asset.id,
+        "status": asset.status,
+        "checksum": asset.checksum,
+        "size_bytes": asset.size_bytes,
     }

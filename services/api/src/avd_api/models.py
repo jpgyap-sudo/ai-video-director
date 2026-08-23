@@ -127,6 +127,8 @@ class ProductAsset(Base):
     object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     content_type: Mapped[str] = mapped_column(String(255), nullable=False)
     checksum: Mapped[str] = mapped_column(String(128), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="QUARANTINED")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

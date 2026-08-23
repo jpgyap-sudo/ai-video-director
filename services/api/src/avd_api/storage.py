@@ -34,6 +34,10 @@ class ObjectStorage(ABC):
     def presigned_url(self, key: str, expires_in: int = 3600) -> str: ...
 
     @abstractmethod
+    def presigned_upload_url(self, key: str, content_type: str, expires_in: int = 3600) -> str:
+        """Return a URL the client can PUT the object to directly."""
+
+    @abstractmethod
     def check(self) -> None:
         """Cheap liveness probe; raises if the backend is unreachable."""
 
@@ -95,6 +99,19 @@ class S3Storage(ObjectStorage):
             )
         )
 
+    def presigned_upload_url(self, key: str, content_type: str, expires_in: int = 3600) -> str:
+        return str(
+            self._client.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": self._bucket,
+                    "Key": key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=expires_in,
+            )
+        )
+
     def check(self) -> None:
         self._client.head_bucket(Bucket=self._bucket)
 
@@ -130,6 +147,9 @@ class LocalStorage(ObjectStorage):
 
     def presigned_url(self, key: str, expires_in: int = 3600) -> str:
         return f"local://{key}"
+
+    def presigned_upload_url(self, key: str, content_type: str, expires_in: int = 3600) -> str:
+        return f"local://{key}?upload=1"
 
     def check(self) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
