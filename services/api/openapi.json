@@ -1367,6 +1367,441 @@
           }
         }
       }
+    },
+    "/v1/references": {
+      "post": {
+        "summary": "Create Reference",
+        "operationId": "create_reference_v1_references_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Create Reference V1 References Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "title": "Type",
+                      "description": "Stable problem type identifier (urn:avd:problem:...)"
+                    },
+                    "title": {
+                      "type": "string",
+                      "title": "Title",
+                      "description": "Short, human-readable summary"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "title": "Status",
+                      "description": "HTTP status code"
+                    },
+                    "detail": {
+                      "type": "string",
+                      "title": "Detail",
+                      "description": "Human-readable explanation specific to this occurrence"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema."
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "title": "Type",
+                      "description": "Stable problem type identifier (urn:avd:problem:...)"
+                    },
+                    "title": {
+                      "type": "string",
+                      "title": "Title",
+                      "description": "Short, human-readable summary"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "title": "Status",
+                      "description": "HTTP status code"
+                    },
+                    "detail": {
+                      "type": "string",
+                      "title": "Detail",
+                      "description": "Human-readable explanation specific to this occurrence"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema."
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "title": "Type",
+                      "description": "Stable problem type identifier (urn:avd:problem:...)"
+                    },
+                    "title": {
+                      "type": "string",
+                      "title": "Title",
+                      "description": "Short, human-readable summary"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "title": "Status",
+                      "description": "HTTP status code"
+                    },
+                    "detail": {
+                      "type": "string",
+                      "title": "Detail",
+                      "description": "Human-readable explanation specific to this occurrence"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema."
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "title": "Type",
+                      "description": "Stable problem type identifier (urn:avd:problem:...)"
+                    },
+                    "title": {
+                      "type": "string",
+                      "title": "Title",
+                      "description": "Short, human-readable summary"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "title": "Status",
+                      "description": "HTTP status code"
+                    },
+                    "detail": {
+                      "type": "string",
+                      "title": "Detail",
+                      "description": "Human-readable explanation specific to this occurrence"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema."
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/references/{reference_id}/attestations": {
+      "post": {
+        "summary": "Create Attestation",
+        "operationId": "create_attestation_v1_references__reference_id__attestations_post",
+        "parameters": [
+          {
+            "name": "reference_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reference Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttestationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Create Attestation V1 References  Reference Id  Attestations Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema.",
+                  "properties": {
+                    "type": {
+                      "description": "Stable problem type identifier (urn:avd:problem:...)",
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "Short, human-readable summary",
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "description": "Human-readable explanation specific to this occurrence",
+                      "title": "Detail",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema.",
+                  "properties": {
+                    "type": {
+                      "description": "Stable problem type identifier (urn:avd:problem:...)",
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "Short, human-readable summary",
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "description": "Human-readable explanation specific to this occurrence",
+                      "title": "Detail",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema.",
+                  "properties": {
+                    "type": {
+                      "description": "Stable problem type identifier (urn:avd:problem:...)",
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "Short, human-readable summary",
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "description": "Human-readable explanation specific to this occurrence",
+                      "title": "Detail",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema.",
+                  "properties": {
+                    "type": {
+                      "description": "Stable problem type identifier (urn:avd:problem:...)",
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "Short, human-readable summary",
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "description": "Human-readable explanation specific to this occurrence",
+                      "title": "Detail",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1385,6 +1820,40 @@
           "checksum"
         ],
         "title": "CompleteAssetRequest"
+      },
+      "CreateAttestationRequest": {
+        "properties": {
+          "claimed_ownership": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Claimed Ownership"
+          },
+          "claimed_license_type": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Claimed License Type"
+          },
+          "claimed_expiry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed Expiry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claimed_ownership",
+          "claimed_license_type"
+        ],
+        "title": "CreateAttestationRequest"
       },
       "CreateOrganizationRequest": {
         "properties": {
@@ -1443,6 +1912,108 @@
           "name"
         ],
         "title": "CreateProjectRequest"
+      },
+      "CreateReferenceRequest": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Id"
+          },
+          "object_key": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Object Key"
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Content Type"
+          },
+          "ownership": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Ownership"
+          },
+          "license_type": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "License Type"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "permitted_channels": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permitted Channels"
+          },
+          "permitted_territories": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permitted Territories"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry"
+          },
+          "reviewer_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "object_key",
+          "content_type",
+          "ownership",
+          "license_type"
+        ],
+        "title": "CreateReferenceRequest"
       },
       "CreateUploadIntentRequest": {
         "properties": {

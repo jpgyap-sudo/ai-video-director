@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -24,6 +26,8 @@ from avd_api.models import (
     Product,
     ProductAsset,
     Project,
+    ReferenceMedia,
+    ReferenceRightsAttestation,
     User,
     uuid7,
 )
@@ -383,4 +387,108 @@ def complete_asset(
         "status": asset.status,
         "checksum": asset.checksum,
         "size_bytes": asset.size_bytes,
+    }
+
+
+class CreateReferenceRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    object_key: str = Field(min_length=1, max_length=1024)
+    content_type: str = Field(min_length=1, max_length=255)
+    ownership: str = Field(min_length=1, max_length=50)
+    license_type: str = Field(min_length=1, max_length=50)
+    source: str | None = Field(default=None, max_length=255)
+    permitted_channels: str | None = Field(default=None, max_length=1024)
+    permitted_territories: str | None = Field(default=None, max_length=1024)
+    expiry: datetime | None = None
+    reviewer_notes: str | None = Field(default=None, max_length=2048)
+
+
+@app.post(
+    "/v1/references",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def create_reference(
+    body: CreateReferenceRequest,
+    organization_id: str = Depends(require_org_principal),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    require_project_in_organization(principal, db, body.project_id, organization_id)
+    ref = ReferenceMedia(
+        organization_id=organization_id,
+        project_id=body.project_id,
+        object_key=body.object_key,
+        content_type=body.content_type,
+        ownership=body.ownership,
+        license_type=body.license_type,
+        source=body.source,
+        permitted_channels=body.permitted_channels,
+        permitted_territories=body.permitted_territories,
+        expiry=body.expiry,
+        reviewer_notes=body.reviewer_notes,
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+    return {
+        "id": ref.id,
+        "organization_id": ref.organization_id,
+        "project_id": ref.project_id,
+        "ownership": ref.ownership,
+        "license_type": ref.license_type,
+    }
+
+
+class CreateAttestationRequest(BaseModel):
+    claimed_ownership: str = Field(min_length=1, max_length=50)
+    claimed_license_type: str = Field(min_length=1, max_length=50)
+    claimed_expiry: datetime | None = None
+
+
+@app.post(
+    "/v1/references/{reference_id}/attestations",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def create_attestation(
+    reference_id: str,
+    body: CreateAttestationRequest,
+    organization_id: str = Depends(require_org_principal),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    ref = db.get(ReferenceMedia, reference_id)
+    if ref is None or ref.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reference not found",
+        )
+    attestation = ReferenceRightsAttestation(
+        organization_id=organization_id,
+        reference_id=ref.id,
+        attested_by_subject=principal.subject,
+        claimed_ownership=body.claimed_ownership,
+        claimed_license_type=body.claimed_license_type,
+        claimed_expiry=body.claimed_expiry,
+    )
+    db.add(attestation)
+    db.commit()
+    db.refresh(attestation)
+    return {
+        "id": attestation.id,
+        "reference_id": attestation.reference_id,
+        "attested_by_subject": attestation.attested_by_subject,
+        "claimed_ownership": attestation.claimed_ownership,
+        "claimed_license_type": attestation.claimed_license_type,
     }
