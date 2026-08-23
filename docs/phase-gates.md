@@ -66,9 +66,11 @@ Slices landed on `master` (hashes verified reachable from `master`):
 | `5db60ff` | Cleanup: unique `(organization_id, sku)`, dependency usage, 422 problem schema |
 | `d7070e9` | Signed uploads: `upload-intents` → `complete` (migration `0003`) |
 | `defc43e` | Upload corrections: magic-byte sniffing, size limit, AV hook, idempotency |
+| `c048d95` | References + rights attestation + cleared-references guard (migration `0004`) |
+| `8c3947e` | References corrections: endpoints + drift detection |
 
-Remaining Phase 1 scope: references + rights attestation, campaigns, Runway
-adapter, generation attempts, reviews, cost events.
+Remaining Phase 1 scope: campaigns, Runway adapter, generation attempts,
+reviews, cost events.
 
 ### Known gaps carried forward
 
@@ -86,3 +88,6 @@ adapter, generation attempts, reviews, cost events.
 - **`version` columns are inert.** No endpoint increments them and no `If-Match`
   is honoured, so `IMPLEMENTATION_PLAN.md:620` (optimistic concurrency) is only
   half met. The first update endpoint must not ship without it.
+- **Attestation immutability is convention-only.** No DB constraint or revoked
+  UPDATE enforces it; it holds only because no update endpoint exists. A
+  `REVOKE UPDATE` on `reference_rights_attestations` would make it structural.
