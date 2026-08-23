@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
@@ -21,11 +21,13 @@ from avd_api.config import get_settings
 from avd_api.db import get_db
 from avd_api.media import ALLOWED_CONTENT_TYPES, SNIFF_HEAD_SIZE, sniff_content_type
 from avd_api.models import (
+    Campaign,
     Membership,
     Organization,
     Product,
     ProductAsset,
     Project,
+    Recipe,
     ReferenceMedia,
     ReferenceRightsAttestation,
     User,
@@ -491,4 +493,122 @@ def create_attestation(
         "attested_by_subject": attestation.attested_by_subject,
         "claimed_ownership": attestation.claimed_ownership,
         "claimed_license_type": attestation.claimed_license_type,
+    }
+
+
+class CreateCampaignRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    product_id: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=255)
+    recipe: Recipe
+    brief: str | None = Field(default=None, max_length=4096)
+
+
+@app.post(
+    "/v1/campaigns",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def create_campaign(
+    body: CreateCampaignRequest,
+    organization_id: str = Depends(require_org_principal),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    require_project_in_organization(principal, db, body.project_id, organization_id)
+    product = db.get(Product, body.product_id)
+    if product is None or product.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+    campaign = Campaign(
+        organization_id=organization_id,
+        project_id=body.project_id,
+        product_id=product.id,
+        name=body.name,
+        recipe=body.recipe.value,
+        brief=body.brief,
+    )
+    db.add(campaign)
+    db.commit()
+    db.refresh(campaign)
+    return {
+        "id": campaign.id,
+        "organization_id": campaign.organization_id,
+        "project_id": campaign.project_id,
+        "product_id": campaign.product_id,
+        "name": campaign.name,
+        "recipe": campaign.recipe,
+        "version": campaign.version,
+    }
+
+
+class UpdateCampaignRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    brief: str | None = Field(default=None, max_length=4096)
+
+
+@app.patch(
+    "/v1/campaigns/{campaign_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        409: problem_response(409),
+        412: problem_response(412),
+        422: problem_response(422),
+    },
+)
+def update_campaign(
+    campaign_id: str,
+    body: UpdateCampaignRequest,
+    request: Request,
+    organization_id: str = Depends(require_org_principal),
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int | None]:
+    campaign = db.get(Campaign, campaign_id)
+    if campaign is None or campaign.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        )
+    # Optimistic concurrency: require If-Match with the current version.
+    if_match = request.headers.get("If-Match")
+    if if_match is None:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="If-Match header required",
+        )
+    try:
+        expected_version = int(if_match.strip('"'))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail="Invalid If-Match value",
+        ) from None
+    if expected_version != campaign.version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign version conflict",
+        )
+    if body.name is not None:
+        campaign.name = body.name
+    if body.brief is not None:
+        campaign.brief = body.brief
+    campaign.version += 1
+    db.commit()
+    db.refresh(campaign)
+    return {
+        "id": campaign.id,
+        "name": campaign.name,
+        "brief": campaign.brief,
+        "version": campaign.version,
     }

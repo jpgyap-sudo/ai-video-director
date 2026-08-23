@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 import os
 import time
 import uuid
@@ -11,6 +12,13 @@ from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from avd_api.db import Base
+
+
+class Recipe(str, enum.Enum):
+    """Closed set of generation recipes (plan §4 line 293)."""
+
+    PRODUCT_AD = "product_ad"
+    PRODUCT_SWAP = "product_swap"
 
 
 def uuid7() -> str:
@@ -208,4 +216,33 @@ class ReferenceRightsAttestation(Base):
     claimed_license_type: Mapped[str] = mapped_column(String(50), nullable=False)
     claimed_expiry: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class Campaign(Base):
+    """A creative brief for a generation run.
+
+    Versioned (optimistic concurrency, plan §4 line 173): every mutable
+    creative object is versioned rather than overwritten. The recipe is a
+    closed enum so the Runway adapter can dispatch on it without re-validating.
+    """
+
+    __tablename__ = "campaigns"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid7)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    recipe: Mapped[str] = mapped_column(String(50), nullable=False)
+    brief: Mapped[str | None] = mapped_column(String(4096), nullable=True)
+    version: Mapped[int] = mapped_column(default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
