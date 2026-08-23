@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from pydantic import BaseModel, Field
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from avd_api.auth import Principal, TestIdentityProvider, get_principal, set_jwks_override
-from avd_api.authorization import require_project_in_organization
+from avd_api.authorization import require_organization, require_project_in_organization
 from avd_api.config import get_settings
 from avd_api.db import get_db
+from avd_api.models import Membership, Organization, Project, User
+from avd_api.problems import register_problem_handlers
 from avd_api.storage import ObjectStorage, build_storage
 
 settings = get_settings()
@@ -20,6 +23,8 @@ app = FastAPI(
     version="0.1.0",
     openapi_url="/openapi.json",
 )
+
+register_problem_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,3 +96,62 @@ def get_project(
         principal, db, project_id, principal.organization_id
     )
     return {"id": project.id, "name": project.name, "organization_id": project.organization_id}
+
+
+class CreateProjectRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+@app.post("/v1/projects", status_code=status.HTTP_201_CREATED)
+def create_project(
+    body: CreateProjectRequest,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if principal.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token has no organization claim",
+        )
+    # Verify the principal is a member of the claimed organization before
+    # creating a project inside it.
+    require_organization(principal, db, principal.organization_id)
+    project = Project(organization_id=principal.organization_id, name=body.name)
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    return {"id": project.id, "name": project.name, "organization_id": project.organization_id}
+
+
+class CreateOrganizationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+@app.post("/v1/organizations", status_code=status.HTTP_201_CREATED)
+def create_organization(
+    body: CreateOrganizationRequest,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Bootstrap path: create an organization and make the caller a member.
+
+    The caller's token must not already carry an organization claim, or the
+    request is rejected (an identity belongs to one org at a time in Phase 1).
+    """
+    if principal.organization_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Identity already belongs to an organization",
+        )
+    org = Organization(name=body.name)
+    db.add(org)
+    db.flush()
+    user = db.scalar(select(User).where(User.subject == principal.subject))
+    if user is None:
+        user = User(subject=principal.subject, email=principal.email)
+        db.add(user)
+        db.flush()
+    db.add(Membership(organization_id=org.id, user_id=user.id, role="owner"))
+    db.commit()
+    db.refresh(org)
+    return {"id": org.id, "name": org.name}
