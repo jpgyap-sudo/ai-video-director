@@ -12,13 +12,41 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 PROBLEM_JSON = "application/problem+json"
 
-# Stable, documented problem types. The base URI is a placeholder until a
-# public docs site exists; each type is a stable slug.
-PROBLEM_BASE = "https://ai-video-director.dev/problems"
+# Stable, non-dereferenceable problem type identifiers. RFC 9457 permits
+# non-dereferenceable URIs; a urn: scheme avoids committing to a hostname we
+# do not own in the public contract.
+PROBLEM_URN_PREFIX = "urn:avd:problem:"
+
+
+class Problem(BaseModel):
+    """RFC 9457 problem-details envelope, declared in the OpenAPI schema."""
+
+    type: str = Field(description="Stable problem type identifier (urn:avd:problem:...)")
+    title: str = Field(description="Short, human-readable summary")
+    status: int = Field(description="HTTP status code")
+    detail: str = Field(description="Human-readable explanation specific to this occurrence")
+
+
+class ValidationProblem(Problem):
+    """Problem envelope for request validation failures."""
+
+    errors: list[dict[str, Any]] = Field(
+        default_factory=list, description="Per-field validation errors"
+    )
+
+
+def problem_response(status_code: int) -> dict[str, Any]:
+    """OpenAPI response spec for a problem-details error."""
+    return {
+        "model": Problem,
+        "description": "RFC 9457 problem-details error",
+        "content": {PROBLEM_JSON: {"schema": Problem.model_json_schema()}},
+    }
 
 
 def _problem(
@@ -29,7 +57,7 @@ def _problem(
     extra: dict[str, Any] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
-        "type": f"{PROBLEM_BASE}/{type_slug}",
+        "type": f"{PROBLEM_URN_PREFIX}{type_slug}",
         "title": title,
         "status": status_code,
         "detail": detail,

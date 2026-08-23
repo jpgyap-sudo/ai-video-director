@@ -9,11 +9,15 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from avd_api.auth import Principal, TestIdentityProvider, get_principal, set_jwks_override
-from avd_api.authorization import require_organization, require_project_in_organization
+from avd_api.authorization import (
+    require_org_principal,
+    require_organization,
+    require_project_in_organization,
+)
 from avd_api.config import get_settings
 from avd_api.db import get_db
 from avd_api.models import Membership, Organization, Project, User
-from avd_api.problems import register_problem_handlers
+from avd_api.problems import problem_response, register_problem_handlers
 from avd_api.storage import ObjectStorage, build_storage
 
 settings = get_settings()
@@ -81,19 +85,22 @@ def jwks() -> dict[str, object]:
     return _identity_provider.jwks
 
 
-@app.get("/v1/projects/{project_id}")
+@app.get(
+    "/v1/projects/{project_id}",
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+    },
+)
 def get_project(
     project_id: str,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    if principal.organization_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token has no organization claim",
-        )
+    organization_id = require_org_principal(principal, db)
     project = require_project_in_organization(
-        principal, db, project_id, principal.organization_id
+        principal, db, project_id, organization_id
     )
     return {"id": project.id, "name": project.name, "organization_id": project.organization_id}
 
@@ -102,21 +109,26 @@ class CreateProjectRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
 
 
-@app.post("/v1/projects", status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/v1/projects",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        409: problem_response(409),
+        422: problem_response(422),
+    },
+)
 def create_project(
     body: CreateProjectRequest,
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    if principal.organization_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token has no organization claim",
-        )
-    # Verify the principal is a member of the claimed organization before
+    organization_id = require_org_principal(principal, db)
+    # Verify the principal is a member of the resolved organization before
     # creating a project inside it.
-    require_organization(principal, db, principal.organization_id)
-    project = Project(organization_id=principal.organization_id, name=body.name)
+    require_organization(principal, db, organization_id)
+    project = Project(organization_id=organization_id, name=body.name)
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -127,7 +139,15 @@ class CreateOrganizationRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
 
 
-@app.post("/v1/organizations", status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/v1/organizations",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        409: problem_response(409),
+        422: problem_response(422),
+    },
+)
 def create_organization(
     body: CreateOrganizationRequest,
     principal: Principal = Depends(get_principal),
@@ -135,10 +155,16 @@ def create_organization(
 ) -> dict[str, str]:
     """Bootstrap path: create an organization and make the caller a member.
 
-    The caller's token must not already carry an organization claim, or the
-    request is rejected (an identity belongs to one org at a time in Phase 1).
+    The caller must not already belong to an organization (by claim or by
+    membership), or the request is rejected (an identity belongs to one org at
+    a time in Phase 1).
     """
-    if principal.organization_id is not None:
+    existing = db.scalar(
+        select(Membership)
+        .join(User, User.id == Membership.user_id)
+        .where(User.subject == principal.subject)
+    )
+    if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Identity already belongs to an organization",
