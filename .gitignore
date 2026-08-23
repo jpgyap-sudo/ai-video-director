@@ -1,6 +1,54 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
 .next/
-.stanley-runtime.json
-*.log
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local SQLite databases created by tests
+*.db
+
+# Environment
 .env
 .env.local
+.env.*.local
+
+# Runtime data
+data/
+uploads/
+tmp/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Secrets - never commit
+*.pem
+*.key
+secrets/

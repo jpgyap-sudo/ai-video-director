@@ -1,14 +1,49 @@
-version: '3.8'
+name: ai-video-director
 
 services:
   postgres:
-    image: postgres
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-avd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avd}
+      POSTGRES_DB: ${POSTGRES_DB:-avd}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-avd} -d ${POSTGRES_DB:-avd}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
-    image: redis
+    image: redis:7.4.1-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  backend:
-    build: ./backend
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  frontend:
-    build: ./frontend
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,14 @@
+{
+  "name": "@ai-video-director/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "generate:client": "openapi-typescript ../../services/api/openapi.json -o src/client.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"contracts: no lint configured\""
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.4.4",
+    "typescript": "5.7.3"
+  }
+}

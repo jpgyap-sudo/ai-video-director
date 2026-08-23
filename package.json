@@ -1,14 +1,24 @@
 {
-  "name": "imported-project",
+  "name": "ai-video-director",
   "version": "0.1.0",
   "private": true,
+  "description": "Furniture campaign operating system - monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "dev": "npm run dev --workspace @ai-video-director/web",
+    "build": "npm run build --workspace @ai-video-director/web",
+    "start": "npm run start --workspace @ai-video-director/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "cd services/api && alembic upgrade head",
+    "generate:client": "npm run generate:client --workspace @ai-video-director/contracts"
   },
-  "dependencies": {
-    "axios": "^1.7.0"
-  },
-  "devDependencies": {}
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
 }

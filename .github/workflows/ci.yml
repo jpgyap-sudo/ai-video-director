@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  web:
+    name: Web (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --workspace @ai-video-director/web
+      - run: npm run typecheck --workspace @ai-video-director/web
+      - run: npm run test --workspace @ai-video-director/web
+      - run: npm run build --workspace @ai-video-director/web
+
+  contracts:
+    name: Contracts (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace @ai-video-director/contracts
+
+  openapi:
+    name: OpenAPI schema + client (regenerate, fail on diff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: pip install -e "services/api[dev]"
+      - run: avd-export-openapi
+      - run: npm ci
+      - run: npm run generate:client
+      - name: Fail if generated artifacts drifted
+        run: git diff --exit-code -- services/api/openapi.json packages/contracts/src/client.ts
+
+  api:
+    name: API (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: avd
+          POSTGRES_PASSWORD: avd
+          POSTGRES_DB: avd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U avd -d avd"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      postgres-migrations:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_USER: avd
+          POSTGRES_PASSWORD: avd
+          POSTGRES_DB: avd_migrations
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U avd -d avd_migrations"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://avd:avd@localhost:5432/avd
+      MIGRATION_TEST_DATABASE_URL: postgresql+psycopg://avd:avd@localhost:5433/avd_migrations
+      STORAGE_BACKEND: local
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: mypy src
+      - run: pytest
+
+  worker:
+    name: Worker (lint, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest
