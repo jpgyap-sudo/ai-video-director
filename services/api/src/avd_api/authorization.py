@@ -7,13 +7,22 @@ browser-supplied input.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from avd_api.auth import Principal, get_principal
 from avd_api.db import get_db
-from avd_api.models import Membership, Organization, Project, User
+from avd_api.models import (
+    Membership,
+    Organization,
+    Project,
+    ReferenceMedia,
+    ReferenceRightsAttestation,
+    User,
+)
 
 
 def resolve_organization_id(principal: Principal, db: Session) -> str:
@@ -102,3 +111,47 @@ def require_project_in_organization(
             detail="Project not found",
         )
     return project
+
+
+def require_cleared_references(
+    principal: Principal, db: Session, project_id: str, organization_id: str
+) -> list[ReferenceMedia]:
+    """Return the project's references only if their rights are cleared.
+
+    A reference is cleared when it has at least one rights attestation and its
+    license has not expired. Expired or unattested references block submission.
+
+    Expiry is checked against UTC now at submission time only; a job that was
+    valid at submission is not retroactively killed if it expires mid-run.
+    """
+    require_project_in_organization(principal, db, project_id, organization_id)
+    references = list(
+        db.scalars(
+            select(ReferenceMedia).where(
+                ReferenceMedia.organization_id == organization_id,
+                ReferenceMedia.project_id == project_id,
+            )
+        ).all()
+    )
+    now = datetime.now(UTC)
+    for ref in references:
+        expiry = ref.expiry
+        if expiry is not None and expiry.tzinfo is None:
+            # SQLite returns naive datetimes; treat them as UTC.
+            expiry = expiry.replace(tzinfo=UTC)
+        if expiry is not None and expiry <= now:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Reference {ref.id} rights have expired",
+            )
+        attested = db.scalar(
+            select(ReferenceRightsAttestation).where(
+                ReferenceRightsAttestation.reference_id == ref.id
+            )
+        )
+        if attested is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Reference {ref.id} has no rights attestation",
+            )
+    return references

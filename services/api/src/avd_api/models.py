@@ -148,3 +148,64 @@ class GenerationJob(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ReferenceMedia(Base):
+    """External video/style image the customer claims authorization for.
+
+    Named `reference_media` (not `references`) because `references` is a
+    PostgreSQL reserved word. Carries the license metadata; the attestation
+    of that license is a separate, immutable record.
+    """
+
+    __tablename__ = "reference_media"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid7)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    # License metadata (plan §4 line 303).
+    ownership: Mapped[str] = mapped_column(String(50), nullable=False, default="OWNED")
+    license_type: Mapped[str] = mapped_column(String(50), nullable=False, default="NONE")
+    source: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    permitted_channels: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    permitted_territories: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer_notes: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ReferenceRightsAttestation(Base):
+    """Immutable record of who attested a reference's rights and when.
+
+    The audit trail is the point of the rights ledger: an attestation is never
+    edited, only appended. The reference's reviewer notes may change; the
+    attestation captures what was claimed at the moment of attestation.
+    """
+
+    __tablename__ = "reference_rights_attestations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid7)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    reference_id: Mapped[str] = mapped_column(
+        ForeignKey("reference_media.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attested_by_subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    attested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Snapshot of the license metadata claimed at attestation time.
+    claimed_ownership: Mapped[str] = mapped_column(String(50), nullable=False)
+    claimed_license_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    claimed_expiry: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
