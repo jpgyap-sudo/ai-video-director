@@ -16,7 +16,7 @@ from avd_api.authorization import (
 )
 from avd_api.config import get_settings
 from avd_api.db import get_db
-from avd_api.models import Membership, Organization, Project, User
+from avd_api.models import Membership, Organization, Product, Project, User
 from avd_api.problems import problem_response, register_problem_handlers
 from avd_api.storage import ObjectStorage, build_storage
 
@@ -181,3 +181,48 @@ def create_organization(
     db.commit()
     db.refresh(org)
     return {"id": org.id, "name": org.name}
+
+
+class CreateProductRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    sku: str = Field(min_length=1, max_length=255)
+    name: str = Field(min_length=1, max_length=255)
+
+
+@app.post(
+    "/v1/products",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: problem_response(401),
+        403: problem_response(403),
+        404: problem_response(404),
+        422: problem_response(422),
+    },
+)
+def create_product(
+    body: CreateProductRequest,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> dict[str, str | int]:
+    organization_id = require_org_principal(principal, db)
+    # The project must belong to the resolved organization.
+    project = require_project_in_organization(
+        principal, db, body.project_id, organization_id
+    )
+    product = Product(
+        organization_id=organization_id,
+        project_id=project.id,
+        sku=body.sku,
+        name=body.name,
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return {
+        "id": product.id,
+        "organization_id": product.organization_id,
+        "project_id": product.project_id,
+        "sku": product.sku,
+        "name": product.name,
+        "version": product.version,
+    }
