@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from avd_api.antivirus import AntivirusScanner, NoopAntivirusScanner
 from avd_api.auth import Principal, TestIdentityProvider, get_principal, set_jwks_override
 from avd_api.authorization import (
     require_org_principal,
@@ -16,7 +17,7 @@ from avd_api.authorization import (
 )
 from avd_api.config import get_settings
 from avd_api.db import get_db
-from avd_api.media import ALLOWED_CONTENT_TYPES, sha256_hex, sniff_content_type
+from avd_api.media import ALLOWED_CONTENT_TYPES, SNIFF_HEAD_SIZE, sniff_content_type
 from avd_api.models import (
     Membership,
     Organization,
@@ -30,6 +31,9 @@ from avd_api.problems import problem_response, register_problem_handlers
 from avd_api.storage import ObjectStorage, build_storage
 
 settings = get_settings()
+
+# Maximum accepted asset size (100 MiB), enforced against the actual object.
+MAX_ASSET_BYTES = 100 * 1024 * 1024
 
 app = FastAPI(
     title="AI Video Director API",
@@ -54,6 +58,7 @@ if settings.environment != "production":
     set_jwks_override(_identity_provider.jwks)
 
 _storage: ObjectStorage | None = None
+_antivirus: AntivirusScanner | None = None
 
 
 def get_storage() -> ObjectStorage:
@@ -66,6 +71,14 @@ def get_storage() -> ObjectStorage:
     if _storage is None:
         _storage = build_storage(settings)
     return _storage
+
+
+def get_antivirus() -> AntivirusScanner:
+    """FastAPI dependency exposing the antivirus scanner (no-op in Phase 1)."""
+    global _antivirus
+    if _antivirus is None:
+        _antivirus = NoopAntivirusScanner()
+    return _antivirus
 
 
 @app.get("/health/live")
@@ -305,6 +318,7 @@ class CompleteAssetRequest(BaseModel):
         401: problem_response(401),
         403: problem_response(403),
         404: problem_response(404),
+        409: problem_response(409),
         422: problem_response(422),
     },
 )
@@ -314,6 +328,7 @@ def complete_asset(
     organization_id: str = Depends(require_org_principal),
     db: Session = Depends(get_db),
     storage: ObjectStorage = Depends(get_storage),
+    antivirus: AntivirusScanner = Depends(get_antivirus),
 ) -> dict[str, str | int]:
     asset = db.get(ProductAsset, asset_id)
     if asset is None or asset.organization_id != organization_id:
@@ -321,26 +336,45 @@ def complete_asset(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found",
         )
+    # Idempotent: an already-validated asset returns its record unchanged.
+    if asset.status == "VALIDATED":
+        return {
+            "id": asset.id,
+            "status": asset.status,
+            "checksum": asset.checksum,
+            "size_bytes": asset.size_bytes,
+        }
     if not storage.exists(asset.object_key):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Object not uploaded yet",
         )
-    data = storage.get(asset.object_key)
-    sniffed = sniff_content_type(data)
+    # Enforce the size limit against the actual object, not the client's claim.
+    actual_size = storage.size(asset.object_key)
+    if actual_size > MAX_ASSET_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Object exceeds the maximum allowed size",
+        )
+    # Sniff from a ranged read of the leading bytes only.
+    head = storage.read_head(asset.object_key, SNIFF_HEAD_SIZE)
+    sniffed = sniff_content_type(head)
     if sniffed is None or sniffed != asset.content_type:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Object content does not match declared content type",
         )
-    actual_checksum = sha256_hex(data)
+    # Malware scan before promoting to the private original.
+    antivirus.scan(asset.object_key)
+    # Streaming checksum; never loads the whole object into memory.
+    actual_checksum = storage.checksum_sha256(asset.object_key)
     if actual_checksum != body.checksum:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Checksum mismatch",
         )
     asset.checksum = actual_checksum
-    asset.size_bytes = len(data)
+    asset.size_bytes = actual_size
     asset.status = "VALIDATED"
     db.commit()
     db.refresh(asset)

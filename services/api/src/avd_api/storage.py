@@ -28,6 +28,18 @@ class ObjectStorage(ABC):
     def exists(self, key: str) -> bool: ...
 
     @abstractmethod
+    def size(self, key: str) -> int:
+        """Return the object size in bytes without reading its body."""
+
+    @abstractmethod
+    def read_head(self, key: str, n: int) -> bytes:
+        """Return the first n bytes of the object without reading the rest."""
+
+    @abstractmethod
+    def checksum_sha256(self, key: str) -> str:
+        """Stream the object and return its SHA-256 hex digest."""
+
+    @abstractmethod
     def delete(self, key: str) -> None: ...
 
     @abstractmethod
@@ -87,6 +99,25 @@ class S3Storage(ObjectStorage):
         except Exception:
             return False
 
+    def size(self, key: str) -> int:
+        resp = self._client.head_object(Bucket=self._bucket, Key=key)
+        return int(resp["ContentLength"])
+
+    def read_head(self, key: str, n: int) -> bytes:
+        resp = self._client.get_object(
+            Bucket=self._bucket, Key=key, Range=f"bytes=0-{n - 1}"
+        )
+        return bytes(resp["Body"].read())
+
+    def checksum_sha256(self, key: str) -> str:
+        import hashlib
+
+        resp = self._client.get_object(Bucket=self._bucket, Key=key)
+        digest = hashlib.sha256()
+        for chunk in resp["Body"].iter_chunks(chunk_size=1024 * 1024):
+            digest.update(chunk)
+        return digest.hexdigest()
+
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
@@ -139,6 +170,22 @@ class LocalStorage(ObjectStorage):
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
+
+    def size(self, key: str) -> int:
+        return self._path(key).stat().st_size
+
+    def read_head(self, key: str, n: int) -> bytes:
+        with self._path(key).open("rb") as f:
+            return f.read(n)
+
+    def checksum_sha256(self, key: str) -> str:
+        import hashlib
+
+        digest = hashlib.sha256()
+        with self._path(key).open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def delete(self, key: str) -> None:
         path = self._path(key)

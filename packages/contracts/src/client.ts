@@ -1139,6 +1139,37 @@ export interface operations {
                 };
             };
             /** @description RFC 9457 problem-details error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
             422: {
                 headers: {
                     [name: string]: unknown;

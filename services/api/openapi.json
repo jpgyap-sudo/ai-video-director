@@ -1275,6 +1275,51 @@
               }
             }
           },
+          "409": {
+            "description": "RFC 9457 problem-details error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "description": "RFC 9457 problem-details envelope, declared in the OpenAPI schema.",
+                  "properties": {
+                    "type": {
+                      "description": "Stable problem type identifier (urn:avd:problem:...)",
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "Short, human-readable summary",
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "description": "Human-readable explanation specific to this occurrence",
+                      "title": "Detail",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "RFC 9457 problem-details error",
             "content": {

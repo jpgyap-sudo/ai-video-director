@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from avd_api.media import sha256_hex
+from avd_api.media import sha256_hex, sniff_content_type
 from avd_api.models import Membership, Organization, Product, Project, User
 
 
@@ -19,6 +19,81 @@ def _seed_product(db_session, subject: str, org_name: str, project_name: str, sk
     db_session.add(product)
     db_session.commit()
     return org, user, product
+
+
+def _upload_png(client, headers, product, object_key, data):
+    intent = client.post(
+        "/v1/assets/upload-intents",
+        json={"product_id": product.id, "content_type": "image/png", "size_bytes": len(data)},
+        headers=headers,
+    ).json()
+    from avd_api.main import get_storage
+
+    get_storage().put(intent["object_key"], data, content_type="image/png")
+    return intent
+
+
+def test_sniff_rejects_wav_and_avi() -> None:
+    wav = b"RIFF" + b"\x00" * 4 + b"WAVE" + b"\x00" * 20
+    avi = b"RIFF" + b"\x00" * 4 + b"AVI " + b"\x00" * 20
+    assert sniff_content_type(wav) is None
+    assert sniff_content_type(avi) is None
+
+
+def test_sniff_accepts_webp() -> None:
+    webp = b"RIFF" + b"\x00" * 4 + b"WEBP" + b"\x00" * 20
+    assert sniff_content_type(webp) == "image/webp"
+
+
+def test_sniff_accepts_mp4_with_0x1c_box() -> None:
+    mp4 = b"\x00\x00\x00\x1cftyp" + b"isom" + b"\x00" * 20
+    assert sniff_content_type(mp4) == "video/mp4"
+
+
+def test_sniff_classifies_mov_as_quicktime() -> None:
+    mov = b"\x00\x00\x00\x18ftypqt  " + b"\x00" * 20
+    assert sniff_content_type(mov) == "video/quicktime"
+
+
+def test_complete_asset_is_idempotent(client, auth_headers, db_session) -> None:
+    org, user, product = _seed_product(db_session, "up-owner-8", "Org A", "Project A", "SKU-8")
+    headers = auth_headers("up-owner-8", org.id)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    intent = _upload_png(client, headers, product, None, png)
+    first = client.post(
+        f"/v1/assets/{intent['asset_id']}/complete",
+        json={"checksum": sha256_hex(png)},
+        headers=headers,
+    )
+    assert first.status_code == 200
+    second = client.post(
+        f"/v1/assets/{intent['asset_id']}/complete",
+        json={"checksum": sha256_hex(png)},
+        headers=headers,
+    )
+    assert second.status_code == 200
+    assert second.json() == first.json()
+
+
+def test_complete_asset_rejects_oversized_object(client, auth_headers, db_session) -> None:
+    org, user, product = _seed_product(db_session, "up-owner-9", "Org A", "Project A", "SKU-9")
+    headers = auth_headers("up-owner-9", org.id)
+    # Declare a small size but upload an oversized object.
+    intent = client.post(
+        "/v1/assets/upload-intents",
+        json={"product_id": product.id, "content_type": "image/png", "size_bytes": 100},
+        headers=headers,
+    ).json()
+    from avd_api.main import MAX_ASSET_BYTES, get_storage
+
+    big = b"\x89PNG\r\n\x1a\n" + b"\x00" * (MAX_ASSET_BYTES + 1)
+    get_storage().put(intent["object_key"], big, content_type="image/png")
+    res = client.post(
+        f"/v1/assets/{intent['asset_id']}/complete",
+        json={"checksum": sha256_hex(big)},
+        headers=headers,
+    )
+    assert res.status_code == 422
 
 
 def test_upload_intent_creates_asset(client, auth_headers, db_session) -> None:
