@@ -11,7 +11,7 @@ def test_http_exception_returns_problem_json(client, auth_headers) -> None:
     assert res.status_code == 404
     assert res.headers["content-type"].startswith("application/problem+json")
     body = res.json()
-    assert body["type"].endswith("/not-found")
+    assert body["type"] == "urn:avd:problem:not-found"
     assert body["title"] == "Not found"
     assert body["status"] == 404
     assert "detail" in body
@@ -30,7 +30,7 @@ def test_validation_error_returns_problem_json(client, auth_headers, db_session)
     assert res.status_code == 422
     assert res.headers["content-type"].startswith("application/problem+json")
     body = res.json()
-    assert body["type"].endswith("/validation-error")
+    assert body["type"] == "urn:avd:problem:validation-error"
     assert body["status"] == 422
     assert "errors" in body
     assert body["errors"][0]["loc"] == ["body", "name"]
@@ -73,5 +73,30 @@ def test_create_project_requires_membership(client, auth_headers, db_session) ->
     # A non-member with the same org claim is rejected.
     headers = auth_headers("proj-intruder", org.id)
     res = client.post("/v1/projects", json={"name": "Sneaky"}, headers=headers)
+    assert res.status_code == 403
+    assert res.headers["content-type"].startswith("application/problem+json")
+
+
+def test_org_resolved_from_membership_when_token_has_no_claim(
+    client, auth_headers, db_session
+) -> None:
+    # A real OIDC token carries no org claim. The org must be resolved from
+    # the principal's single membership.
+    org = Organization(name="Org A")
+    user = User(subject="no-claim-user", email="no-claim-user@example.com")
+    db_session.add_all([org, user])
+    db_session.flush()
+    db_session.add(Membership(organization_id=org.id, user_id=user.id, role="owner"))
+    db_session.commit()
+    headers = auth_headers("no-claim-user", None)  # no org claim
+    res = client.post("/v1/projects", json={"name": "Resolved"}, headers=headers)
+    assert res.status_code == 201
+    assert res.json()["organization_id"] == org.id
+
+
+def test_org_resolution_requires_membership(client, auth_headers, db_session) -> None:
+    # No membership at all -> 403.
+    headers = auth_headers("no-membership-user", None)
+    res = client.post("/v1/projects", json={"name": "Nope"}, headers=headers)
     assert res.status_code == 403
     assert res.headers["content-type"].startswith("application/problem+json")

@@ -102,8 +102,9 @@ export interface paths {
          * Create Organization
          * @description Bootstrap path: create an organization and make the caller a member.
          *
-         *     The caller's token must not already carry an organization claim, or the
-         *     request is rejected (an identity belongs to one org at a time in Phase 1).
+         *     The caller must not already belong to an organization (by claim or by
+         *     membership), or the request is rejected (an identity belongs to one org at
+         *     a time in Phase 1).
          */
         post: operations["create_organization_v1_organizations_post"];
         delete?: never;
@@ -130,6 +131,32 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * Problem
+         * @description RFC 9457 problem-details envelope, declared in the OpenAPI schema.
+         */
+        Problem: {
+            /**
+             * Type
+             * @description Stable problem type identifier (urn:avd:problem:...)
+             */
+            type: string;
+            /**
+             * Title
+             * @description Short, human-readable summary
+             */
+            title: string;
+            /**
+             * Status
+             * @description HTTP status code
+             */
+            status: number;
+            /**
+             * Detail
+             * @description Human-readable explanation specific to this occurrence
+             */
+            detail: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -237,6 +264,99 @@ export interface operations {
                     };
                 };
             };
+            /** @description RFC 9457 problem-details error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -272,13 +392,128 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description RFC 9457 problem-details error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -307,13 +542,97 @@ export interface operations {
                     };
                 };
             };
-            /** @description Validation Error */
+            /** @description RFC 9457 problem-details error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description RFC 9457 problem-details error */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };
