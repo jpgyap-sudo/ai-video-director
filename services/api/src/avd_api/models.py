@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from avd_api.db import Base
@@ -106,6 +106,11 @@ class Product(Base):
     version: Mapped[int] = mapped_column(default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        # SKU is the natural business key, unique within an organization.
+        UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),
     )
 
 

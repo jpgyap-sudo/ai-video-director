@@ -153,11 +153,6 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
         /**
          * Problem
          * @description RFC 9457 problem-details envelope, declared in the OpenAPI schema.
@@ -183,15 +178,6 @@ export interface components {
              * @description Human-readable explanation specific to this occurrence
              */
             detail: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
         };
     };
     responses: never;
@@ -383,13 +369,35 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Validation Error */
+            /** @description RFC 9457 problem-details error */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/problem+json": {
+                        /**
+                         * Type
+                         * @description Stable problem type identifier (urn:avd:problem:...)
+                         */
+                        type: string;
+                        /**
+                         * Title
+                         * @description Short, human-readable summary
+                         */
+                        title: string;
+                        /**
+                         * Status
+                         * @description HTTP status code
+                         */
+                        status: number;
+                        /**
+                         * Detail
+                         * @description Human-readable explanation specific to this occurrence
+                         */
+                        detail: string;
+                    };
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };

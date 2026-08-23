@@ -91,14 +91,15 @@ def jwks() -> dict[str, object]:
         401: problem_response(401),
         403: problem_response(403),
         404: problem_response(404),
+        422: problem_response(422),
     },
 )
 def get_project(
     project_id: str,
+    organization_id: str = Depends(require_org_principal),
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    organization_id = require_org_principal(principal, db)
     project = require_project_in_organization(
         principal, db, project_id, organization_id
     )
@@ -121,10 +122,10 @@ class CreateProjectRequest(BaseModel):
 )
 def create_project(
     body: CreateProjectRequest,
+    organization_id: str = Depends(require_org_principal),
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    organization_id = require_org_principal(principal, db)
     # Verify the principal is a member of the resolved organization before
     # creating a project inside it.
     require_organization(principal, db, organization_id)
@@ -201,10 +202,10 @@ class CreateProductRequest(BaseModel):
 )
 def create_product(
     body: CreateProductRequest,
+    organization_id: str = Depends(require_org_principal),
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> dict[str, str | int]:
-    organization_id = require_org_principal(principal, db)
     # The project must belong to the resolved organization.
     project = require_project_in_organization(
         principal, db, body.project_id, organization_id
